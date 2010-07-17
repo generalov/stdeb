@@ -571,11 +571,19 @@ class DebianInfo:
             self.long_description = ''
 
         if not no_pycentral:
-            build_deps.extend(  [
-                'python-all-dev (>= 2.3.5-11)',
-                'debhelper (>= 5.0.38)',
-                'python-central (>= 0.5.6)',
-                ] )
+            xs_python_version = parse_val(cfg,module_name,'XS-Python-Version')
+            if xs_python_version == 'all':
+                build_deps.extend(  [
+                    'python-all-dev (>= 2.3.5-11)',
+                    'debhelper (>= 5.0.38)',
+                    'python-central (>= 0.5.6)',
+                    ] )
+            else:
+                build_deps.extend(  [
+                    'python (%s)' % xs_python_version,
+                    'debhelper (>= 5.0.38)',
+                    'python-central (>= 0.5.6)',
+                    ] )
         else:
             build_deps.extend(  [
                 'python-all-dev',
