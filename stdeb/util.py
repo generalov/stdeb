@@ -771,77 +771,75 @@ def build_dsc(debinfo,
     ###############################################
     # 2. create debian/ directory and contents
     debian_dir = os.path.join(fullpath_repackaged_dirname,'debian')
-    if not os.path.exists(debian_dir):
+    if os.path.exists(debian_dir):
+        rules_fname = os.path.join(debian_dir,'rules')
+        os.chmod(rules_fname,0755)
+    else:
         os.mkdir(debian_dir)
 
-    #    A. debian/changelog
-    fd = open( os.path.join(debian_dir,'changelog'), mode='w')
-    fd.write("""\
-%(source)s (%(full_version)s) %(distname)s; urgency=low
+        #    A. debian/changelog
+        fd = open( os.path.join(debian_dir,'changelog'), mode='w')
+        fd.write(CHANGELOG%debinfo.__dict__)
+        fd.close()
 
-  * source package automatically created by stdeb %(stdeb_version)s
+        #    B. debian/control
+        if debinfo.uploaders:
+            debinfo.uploaders = 'Uploaders: %s\n' % ', '.join(debinfo.uploaders)
+        else:
+            debinfo.uploaders = ''
+        control = CONTROL_FILE%debinfo.__dict__
+        fd = open( os.path.join(debian_dir,'control'), mode='w')
+        fd.write(control)
+        fd.close()
 
- -- %(maintainer)s  %(date822)s\n"""%debinfo.__dict__)
-    fd.close()
+        #    C. debian/rules
+        if debinfo.architecture == 'all':
+            debinfo.rules_binary=RULES_BINARY_INDEP%debinfo.__dict__
+        else:
+            debinfo.rules_binary=RULES_BINARY_ARCH%debinfo.__dict__
 
-    #    B. debian/control
-    if debinfo.uploaders:
-        debinfo.uploaders = 'Uploaders: %s\n' % ', '.join(debinfo.uploaders)
-    else:
-        debinfo.uploaders = ''
-    control = CONTROL_FILE%debinfo.__dict__
-    fd = open( os.path.join(debian_dir,'control'), mode='w')
-    fd.write(control)
-    fd.close()
+        rules = RULES_MAIN%debinfo.__dict__
 
-    #    C. debian/rules
-    if debinfo.architecture == 'all':
-        debinfo.rules_binary=RULES_BINARY_INDEP%debinfo.__dict__
-    else:
-        debinfo.rules_binary=RULES_BINARY_ARCH%debinfo.__dict__
+        rules = rules.replace('        ','\t')
+        rules_fname = os.path.join(debian_dir,'rules')
+        fd = open( rules_fname, mode='w')
+        fd.write(rules)
+        fd.close()
+        os.chmod(rules_fname,0755)
 
-    rules = RULES_MAIN%debinfo.__dict__
+        fd = open( os.path.join(debian_dir,
+                                debinfo.package+'.dirs'),
+                   mode='w')
+        for install_dir in debinfo.install_dirs:
+            fd.write(install_dir+'\n')
+        fd.close()
 
-    rules = rules.replace('        ','\t')
-    rules_fname = os.path.join(debian_dir,'rules')
-    fd = open( rules_fname, mode='w')
-    fd.write(rules)
-    fd.close()
-    os.chmod(rules_fname,0755)
+        #    D. debian/compat
+        fd = open( os.path.join(debian_dir,'compat'), mode='w')
+        fd.write('4\n')
+        fd.close()
 
-    fd = open( os.path.join(debian_dir,
-                            debinfo.package+'.dirs'),
-               mode='w')
-    for install_dir in debinfo.install_dirs:
-        fd.write(install_dir+'\n')
-    fd.close()
+        #    E. debian/package.mime
+        if debinfo.mime_file != '':
+            if not os.path.exists(debinfo.mime_file):
+                raise ValueError(
+                    'a MIME file was specified, but does not exist: %s'%(
+                    debinfo.mime_file,))
+            os.link( debinfo.mime_file,
+                     os.path.join(debian_dir,debinfo.package+'.mime'))
+        if debinfo.shared_mime_file != '':
+            if not os.path.exists(debinfo.shared_mime_file):
+                raise ValueError(
+                    'a shared MIME file was specified, but does not exist: %s'%(
+                    debinfo.shared_mime_file,))
+            os.link( debinfo.shared_mime_file,
+                     os.path.join(debian_dir,
+                                  debinfo.package+'.sharedmimeinfo'))
 
-    #    D. debian/compat
-    fd = open( os.path.join(debian_dir,'compat'), mode='w')
-    fd.write('4\n')
-    fd.close()
-
-    #    E. debian/package.mime
-    if debinfo.mime_file != '':
-        if not os.path.exists(debinfo.mime_file):
-            raise ValueError(
-                'a MIME file was specified, but does not exist: %s'%(
-                debinfo.mime_file,))
-        os.link( debinfo.mime_file,
-                 os.path.join(debian_dir,debinfo.package+'.mime'))
-    if debinfo.shared_mime_file != '':
-        if not os.path.exists(debinfo.shared_mime_file):
-            raise ValueError(
-                'a shared MIME file was specified, but does not exist: %s'%(
-                debinfo.shared_mime_file,))
-        os.link( debinfo.shared_mime_file,
-                 os.path.join(debian_dir,
-                              debinfo.package+'.sharedmimeinfo'))
-
-    #    F. debian/copyright
-    if debinfo.copyright_file != '':
-        os.link( debinfo.copyright_file,
-                 os.path.join(debian_dir,'copyright'))
+        #    F. debian/copyright
+        if debinfo.copyright_file != '':
+            os.link( debinfo.copyright_file,
+                     os.path.join(debian_dir,'copyright'))
 
     ###############################################
     # 3. unpack original source tarball
@@ -899,6 +897,15 @@ def build_dsc(debinfo,
         dsc_name = debinfo.source + '_' + debinfo.dsc_version + '.dsc'
         dpkg_source('-x',dsc_name,
                     cwd=dist_dir)
+
+
+CHANGELOG= """\
+%(source)s (%(full_version)s) %(distname)s; urgency=low
+
+  * source package automatically created by stdeb %(stdeb_version)s
+
+ -- %(maintainer)s  %(date822)s
+"""
 
 CONTROL_FILE = """\
 Source: %(source)s
