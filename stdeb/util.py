@@ -118,6 +118,26 @@ def debianize_version(name):
     name = name.lower()
     return name
 
+def get_dsc_version(cwd):
+    """return output of 822-date command"""
+    cmd = '/usr/bin/dpkg-parsechangelog'
+    print cwd, cmd
+    exit
+    if not os.path.exists(cmd):
+        raise ValueError('%s command does not exist.'%cmd)
+    args = [cmd,'-c1']
+    cmd = subprocess.Popen(args,stdout=subprocess.PIPE,cwd=cwd)
+    returncode = cmd.wait()
+    if returncode:
+        log.error('ERROR running: %s', ' '.join(args))
+        raise RuntimeError('returncode %d', returncode)
+    result = filter(lambda line: line.startswith('Version:'), cmd.stdout)
+    if not len(result):
+        return None
+    version = result[0]
+    debian_version = version[len('Version: '):].strip()
+    return debian_version
+
 def get_date_822():
     """return output of 822-date command"""
     cmd = '/bin/date'
@@ -482,6 +502,7 @@ class DebianInfo:
         if debian_version is not None:
             # command-line arg overrides file
             self.packaging_version = debian_version
+        # this can be rewrited late if distribution contains debian/changelog
         self.dsc_version = '%s-%s'%(
             self.upstream_version,
             self.packaging_version)
@@ -774,6 +795,7 @@ def build_dsc(debinfo,
     if os.path.exists(debian_dir):
         rules_fname = os.path.join(debian_dir,'rules')
         os.chmod(rules_fname,0755)
+        debinfo.dsc_version = get_dsc_version(cwd=fullpath_repackaged_dirname)
     else:
         os.mkdir(debian_dir)
 
